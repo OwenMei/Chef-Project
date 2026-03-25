@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Chef's Kitchen</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap');
+:root{--cream:#FFF8EE;--warm:#FF6B35;--warm2:#FF9A6C;--gold:#FFD166;--green:#06D6A0;--teal:#118AB2;--pink:#EF476F;--dark:#1A1A2E;--mid:#2D2D44;--surface:#FFFFFF;--border:#E8D5B7;--muted:#9B8FA0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Nunito',sans-serif;background:var(--cream);min-height:100vh;color:var(--dark);overflow-x:hidden}
+header{background:linear-gradient(135deg,#FF6B35,#FF9A6C);padding:14px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 20px rgba(255,107,53,.3)}
+.logo{font-family:'Fredoka One',cursive;font-size:26px;color:#FFF;letter-spacing:1px}
+.sub{font-size:12px;color:rgba(255,255,255,.85);font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.model-status{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:rgba(255,255,255,.9)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#FFD166;animation:pulse .8s ease-in-out infinite alternate}
+.status-dot.ready{background:#06D6A0;animation:none}
+@keyframes pulse{to{opacity:.3}}
+main{max-width:820px;margin:0 auto;padding:24px 16px 80px}
+.phases{display:flex;gap:0;margin-bottom:28px;background:var(--surface);border:1.5px solid var(--border);border-radius:50px;padding:5px;width:fit-content}
+.phase-pill{padding:6px 18px;border-radius:50px;font-size:12px;font-weight:700;color:var(--muted);transition:all .3s;display:flex;align-items:center;gap:6px}
+.phase-pill.active{background:var(--warm);color:#fff}
+.phase-pill.done{background:#e8f8f3;color:var(--green)}
+.card{background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:26px;box-shadow:0 4px 24px rgba(26,26,46,.08);margin-bottom:20px}
+h2{font-family:'Fredoka One',cursive;font-size:22px;color:var(--warm);margin-bottom:8px}
+p.desc{font-size:14px;color:#777;line-height:1.6;margin-bottom:20px}
+.upload-zone{border:2.5px dashed var(--border);border-radius:16px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .25s;position:relative;background:var(--cream)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--warm);background:#fff5ec}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:52px;margin-bottom:12px}
+.upload-zone h3{font-size:16px;font-weight:700;color:var(--dark);margin-bottom:6px}
+.upload-zone .hint{font-size:13px;color:#aaa}
+.preview-img{width:100%;max-height:260px;object-fit:contain;border-radius:12px;border:1.5px solid var(--border);margin-bottom:16px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 24px;border-radius:50px;border:none;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--warm);color:#fff;box-shadow:0 4px 14px rgba(255,107,53,.4)}
+.btn-primary:hover{background:#e55a26;transform:translateY(-1px)}
+.btn-primary:disabled{background:#ccc;box-shadow:none;transform:none;cursor:not-allowed}
+.btn-secondary{background:var(--surface);color:var(--warm);border:2px solid var(--warm)}
+.btn-secondary:hover{background:#fff5ec}
+.loader{display:flex;align-items:center;gap:12px;padding:16px;background:#fff8f0;border-radius:12px;border:1.5px solid #ffd6b8}
+.spinner{width:24px;height:24px;border-radius:50%;border:3px solid #ffd6b8;border-top-color:var(--warm);animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.chip{display:flex;align-items:center;gap:6px;background:var(--cream);border:1.5px solid var(--border);border-radius:50px;padding:6px 14px;font-size:13px;font-weight:600}
+.recipe-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+.recipe-dish-emoji{font-size:60px;line-height:1}
+.recipe-info h3{font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:6px}
+.meta{font-size:13px;color:#888;display:flex;gap:16px;flex-wrap:wrap}
+.steps-list{list-style:none}
+.steps-list li{display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border)}
+.steps-list li:last-child{border-bottom:none}
+.step-num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--warm);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step-text{font-size:14px;line-height:1.6}
+.step-text strong{color:var(--warm)}
+.game-hud{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:var(--dark);border-radius:14px;margin-bottom:14px}
+.hud-item{text-align:center}
+.hud-label{font-size:10px;color:rgba(255,255,255,.5);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.hud-val{font-family:'Fredoka One',cursive;font-size:22px;color:var(--gold)}
+.prog-wrap{flex:1;padding:0 20px}
+.prog-track{background:rgba(255,255,255,.1);border-radius:50px;height:10px;overflow:hidden}
+.prog-fill{height:100%;border-radius:50px;background:linear-gradient(90deg,var(--green),#00e5b4);transition:width .4s}
+#step-box{background:#fff;border:2px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px}
+.step-action-badge{flex-shrink:0;padding:6px 14px;border-radius:50px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+#step-instruction-text{font-size:14px;font-weight:600;color:var(--dark);line-height:1.5}
+#minigame-wrap{background:#0f0f1e;border-radius:18px;overflow:hidden;position:relative}
+#minigame-canvas{display:block;width:100%;touch-action:none}
+.result-banner{text-align:center;padding:32px}
+.result-dish-emoji{font-size:80px;display:block;margin-bottom:14px}
+.score-ring{width:100px;height:100px;margin:16px auto;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:28px;color:var(--dark);box-shadow:0 6px 20px rgba(255,209,102,.5)}
+.hidden{display:none!important}
+.model-loading-banner{background:#fffbe6;border:1.5px solid #FFD166;border-radius:12px;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">🍳 Chef's Kitchen</div>
+    <div class="sub">AI Cooking Simulator</div>
+  </div>
+  <div class="model-status" id="modelStatus">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Loading AI…</span>
+  </div>
+</header>
+<main>
+<div class="phases">
+  <div class="phase-pill active" id="ph1">📸 Scan</div>
+  <div class="phase-pill" id="ph2">📋 Recipe</div>
+  <div class="phase-pill" id="ph3">🎮 Cook!</div>
+</div>
+
+<!-- PHASE 1 -->
+<div id="phase-upload">
+  <div class="card">
+    <h2>📸 Snap your ingredients</h2>
+    <p class="desc">Upload a photo of your fridge or pantry. Our on-device AI will identify ingredients and craft a recipe!</p>
+    <div id="model-loading-banner" class="model-loading-banner">
+      <div class="spinner" style="width:18px;height:18px;border-color:#ffd6b8;border-top-color:#FF6B35"></div>
+      <span>Loading on-device AI models (first load ~5 sec)…</span>
+    </div>
+    <div class="upload-zone" id="dropzone">
+      <input type="file" id="imgInput" accept="image/*">
+      <div class="upload-icon">🖼️</div>
+      <h3>Drop a photo here or click to browse</h3>
+      <p class="hint">JPG · PNG · WEBP</p>
+    </div>
+    <img id="preview" class="preview-img hidden" alt="Preview">
+    <div id="analyze-wrap" class="hidden" style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" id="analyzeBtn" disabled>🔍 Analyze Ingredients</button>
+      <button class="btn btn-secondary" id="reuploadBtn">↩ Change photo</button>
+    </div>
+    <div id="loader-scan" class="loader hidden" style="margin-top:16px">
+      <div class="spinner"></div><span style="font-size:14px;font-weight:600">Detecting ingredients on-device…</span>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 2 -->
+<div id="phase-recipe" class="hidden">
+  <div class="card">
+    <h2>🥗 Ingredients detected</h2>
+    <div class="chips" id="ingredient-chips"></div>
+  </div>
+  <div class="card hidden" id="recipe-card">
+    <div class="recipe-header">
+      <div class="recipe-dish-emoji" id="recipe-emoji">🍽️</div>
+      <div class="recipe-info">
+        <h3 id="recipe-title">Loading…</h3>
+        <div class="meta">
+          <span>⏱ <span id="recipe-time">–</span></span>
+          <span>👤 <span id="recipe-servings">–</span></span>
+          <span>⚡ <span id="recipe-difficulty">–</span></span>
+        </div>
+      </div>
+    </div>
+    <ol class="steps-list" id="recipe-steps"></ol>
+  </div>
+  <div id="loader-recipe" class="loader hidden">
+    <div class="spinner"></div><span style="font-size:14px;font-weight:600">Crafting your perfect recipe…</span>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+    <button class="btn btn-primary hidden" id="startGameBtn">🎮 Start Cooking!</button>
+    <button class="btn btn-secondary hidden" id="regenBtn">🔄 New Recipe</button>
+  </div>
+</div>
+
+<!-- PHASE 3 -->
+<div id="phase-game" class="hidden">
+  <div class="game-hud">
+    <div class="hud-item">
+      <div class="hud-label">Score</div>
+      <div class="hud-val" id="hud-score">0</div>
+    </div>
+    <div class="hud-item prog-wrap">
+      <div class="hud-label" style="margin-bottom:6px">Step <span id="hud-step">1</span> of <span id="hud-total">?</span></div>
+      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-label">Combo</div>
+      <div class="hud-val" id="hud-combo">×1</div>
+    </div>
+  </div>
+  <div id="step-box">
+    <div class="step-action-badge" id="step-badge" style="background:#FFD166;color:#1A1A2E">ACTION</div>
+    <div id="step-instruction-text">Get ready…</div>
+  </div>
+  <div id="minigame-wrap">
+    <canvas id="minigame-canvas" width="780" height="340"></canvas>
+  </div>
+  <div id="result-card" class="card hidden" style="margin-top:20px">
+    <div class="result-banner">
+      <span class="result-dish-emoji" id="result-emoji">🍳</span>
+      <h2 id="result-title" style="font-family:'Fredoka One',cursive;font-size:28px;color:var(--dark)">Dish complete!</h2>
+      <p id="result-msg" style="color:#777;font-size:14px;margin-top:6px"></p>
+      <div class="score-ring" id="result-score">0</div>
+      <div style="font-size:15px;margin-top:4px" id="result-stars"></div>
+      <div style="margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="restartFull()">🔄 New Dish</button>
+        <button class="btn btn-secondary" onclick="replayCook()">↩ Cook Again</button>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════
+const ACTION_META = {
+  chop:   {color:'#EF476F',bg:'#ffeef2',label:'CHOP',   desc:'Click when the knife is in the green zone!'},
+  fry:    {color:'#FF9A00',bg:'#fff5e0',label:'FRY',    desc:'Hold to heat — stay in the perfect zone!'},
+  boil:   {color:'#118AB2',bg:'#e4f4fb',label:'BOIL',   desc:'Bring to a boil, then stir to prevent sticking!'},
+  mix:    {color:'#9B5DE5',bg:'#f3eeff',label:'MIX',    desc:'Draw full circles in the bowl!'},
+  stir:   {color:'#9B5DE5',bg:'#f3eeff',label:'STIR',   desc:'Draw full circles in the pan!'},
+  season: {color:'#06D6A0',bg:'#e0faf4',label:'SEASON', desc:'Shake and stop in the perfect zone!'},
+  bake:   {color:'#FF6B35',bg:'#fff0eb',label:'BAKE',   desc:'Set the dial to the green zone and hold!'},
+  grill:  {color:'#D62828',bg:'#ffeaea',label:'GRILL',  desc:'Cover all grill lines, then flip and repeat!'},
+  add:    {color:'#3A86FF',bg:'#e8f1ff',label:'ADD',    desc:'Drag the ingredient into the pot!'},
+  default:{color:'#888',   bg:'#f5f5f5',label:'COOK',   desc:'Follow the on-screen prompt!'},
+};
+
+// COCO-SSD food class → ingredient mapping
+const COCO_FOOD_MAP = {
+  'banana':    {name:'banana',emoji:'🍌'},
+  'apple':     {name:'apple',emoji:'🍎'},
+  'sandwich':  {name:'sandwich',emoji:'🥪'},
+  'orange':    {name:'orange',emoji:'🍊'},
+  'broccoli':  {name:'broccoli',emoji:'🥦'},
+  'carrot':    {name:'carrot',emoji:'🥕'},
+  'hot dog':   {name:'sausage',emoji:'🌭'},
+  'pizza':     {name:'pizza',emoji:'🍕'},
+  'donut':     {name:'donut',emoji:'🍩'},
+  'cake':      {name:'cake',emoji:'🎂'},
+  'bottle':    {name:'oil',emoji:'🫙'},
+  'wine glass':{name:'wine',emoji:'🍷'},
+  'cup':       {name:'beverage',emoji:'☕'},
+  'bowl':      {name:'soup',emoji:'🥣'},
+};
+
+// MobileNet ImageNet → ingredient mapping (keyword search)
+const MOBILENET_FOOD_MAP = [
+  {keys:['banana'],name:'banana',emoji:'🍌'},
+  {keys:['granny smith','bramley'],name:'apple',emoji:'🍎'},
+  {keys:['orange','navel'],name:'orange',emoji:'🍊'},
+  {keys:['lemon','lime'],name:'lemon',emoji:'🍋'},
+  {keys:['strawberry'],name:'strawberry',emoji:'🍓'},
+  {keys:['pineapple','ananas'],name:'pineapple',emoji:'🍍'},
+  {keys:['mango'],name:'mango',emoji:'🥭'},
+  {keys:['watermelon'],name:'watermelon',emoji:'🍉'},
+  {keys:['grape','cabernet'],name:'grapes',emoji:'🍇'},
+  {keys:['cherry'],name:'cherries',emoji:'🍒'},
+  {keys:['peach'],name:'peach',emoji:'🍑'},
+  {keys:['broccoli'],name:'broccoli',emoji:'🥦'},
+  {keys:['cauliflower'],name:'cauliflower',emoji:'🥦'},
+  {keys:['carrot'],name:'carrot',emoji:'🥕'},
+  {keys:['bell pepper','capsicum'],name:'bell pepper',emoji:'🫑'},
+  {keys:['tomato'],name:'tomato',emoji:'🍅'},
+  {keys:['cucumber'],name:'cucumber',emoji:'🥒'},
+  {keys:['mushroom','agaric'],name:'mushroom',emoji:'🍄'},
+  {keys:['onion'],name:'onion',emoji:'🧅'},
+  {keys:['garlic'],name:'garlic',emoji:'🧄'},
+  {keys:['potato'],name:'potato',emoji:'🥔'},
+  {keys:['corn','maize'],name:'corn',emoji:'🌽'},
+  {keys:['avocado'],name:'avocado',emoji:'🥑'},
+  {keys:['eggplant','aubergine'],name:'eggplant',emoji:'🍆'},
+  {keys:['zucchini','courgette'],name:'zucchini',emoji:'🥒'},
+  {keys:['lettuce','cabbage'],name:'lettuce',emoji:'🥬'},
+  {keys:['artichoke'],name:'artichoke',emoji:'🥬'},
+  {keys:['leek'],name:'leek',emoji:'🧄'},
+  {keys:['egg','hen','yolk'],name:'egg',emoji:'🥚'},
+  {keys:['chicken','drumstick','cock','hen','poultry'],name:'chicken',emoji:'🍗'},
+  {keys:['beef','steak','hamburger','meat'],name:'beef',emoji:'🥩'},
+  {keys:['pork','ham','bacon'],name:'pork',emoji:'🥩'},
+  {keys:['fish','salmon','tuna','cod','tilapia','anchovy'],name:'fish',emoji:'🐟'},
+  {keys:['shrimp','prawn','lobster','crab'],name:'shrimp',emoji:'🦐'},
+  {keys:['cheese'],name:'cheese',emoji:'🧀'},
+  {keys:['milk'],name:'milk',emoji:'🥛'},
+  {keys:['butter'],name:'butter',emoji:'🧈'},
+  {keys:['bread','loaf','baguette','bagel'],name:'bread',emoji:'🍞'},
+  {keys:['pasta','spaghetti','noodle'],name:'pasta',emoji:'🍝'},
+  {keys:['rice','pilaf'],name:'rice',emoji:'🍚'},
+  {keys:['peanut','nut'],name:'nuts',emoji:'🥜'},
+  {keys:['chocolate','cocoa'],name:'chocolate',emoji:'🍫'},
+  {keys:['herb','basil','parsley','thyme','rosemary'],name:'fresh herbs',emoji:'🌿'},
+  {keys:['oil','olive'],name:'olive oil',emoji:'🫙'},
+  {keys:['sauce','ketchup','mustard'],name:'sauce',emoji:'🥫'},
+  {keys:['soup','stew','chowder'],name:'soup base',emoji:'🥣'},
+  {keys:['pizza'],name:'pizza dough',emoji:'🍕'},
+  {keys:['hot dog','sausage'],name:'sausage',emoji:'🌭'},
+];
+
+function mapMobileNetPrediction(className, probability) {
+  if (probability < 0.04) return null;
+  const lower = className.toLowerCase();
+  for (const m of MOBILENET_FOOD_MAP) {
+    if (m.keys.some(k => lower.includes(k))) return m;
+  }
+  return null;
+}
+
+function getDefaultIngredients() {
+  return [
+    {name:'chicken',emoji:'🍗'},
+    {name:'vegetables',emoji:'🥬'},
+    {name:'garlic',emoji:'🧄'},
+    {name:'olive oil',emoji:'🫙'},
+    {name:'salt & pepper',emoji:'🧂'},
+  ];
+}
+
+// ═══════════════════════════════════════════════
+// TF.JS MODEL LOADING
+// ═══════════════════════════════════════════════
+let mobilenetModel = null;
+let cocoSsdModel = null;
+let modelsReady = false;
+
+async function loadTFModels() {
+  try {
+    [mobilenetModel, cocoSsdModel] = await Promise.all([
+      mobilenet.load({version:2, alpha:0.5}),
+      cocoSsd.load({base:'lite_mobilenet_v2'})
+    ]);
+    modelsReady = true;
+    document.getElementById('statusDot').classList.add('ready');
+    document.getElementById('statusText').textContent = 'AI Ready';
+    document.getElementById('model-loading-banner').classList.add('hidden');
+    if (imageBase64) document.getElementById('analyzeBtn').disabled = false;
+  } catch(err) {
+    console.warn('TF.js load failed, will use fallback:', err);
+    document.getElementById('statusText').textContent = 'Manual mode';
+    document.getElementById('model-loading-banner').innerHTML = '⚠️ On-device AI unavailable — using smart detection fallback';
+    modelsReady = false;
+    if (imageBase64) document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+window.addEventListener('DOMContentLoaded', loadTFModels);
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let imageBase64 = null, detectedIngredients = [], recipeData = null;
+let gameActive = false, gameRAF = null, MG = {};
+
+// ═══════════════════════════════════════════════
+// PHASE SWITCH
+// ═══════════════════════════════════════════════
+function setPhase(n) {
+  ['ph1','ph2','ph3'].forEach((id,i) => {
+    document.getElementById(id).className = 'phase-pill'+(i+1===n?' active':i+1<n?' done':'');
+  });
+  document.getElementById('phase-upload').classList.toggle('hidden',n!==1);
+  document.getElementById('phase-recipe').classList.toggle('hidden',n!==2);
+  document.getElementById('phase-game').classList.toggle('hidden',n!==3);
+}
+
+// ═══════════════════════════════════════════════
+// UPLOAD
+// ═══════════════════════════════════════════════
+const dropzone = document.getElementById('dropzone');
+const imgInput = document.getElementById('imgInput');
+const preview  = document.getElementById('preview');
+const analyzeWrap = document.getElementById('analyze-wrap');
+
+imgInput.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+document.getElementById('reuploadBtn').addEventListener('click', () => {
+  imageBase64 = null; preview.classList.add('hidden'); dropzone.style.display = '';
+  analyzeWrap.classList.add('hidden'); imgInput.value = '';
+});
+
+function handleFile(file) {
+  const r = new FileReader();
+  r.onload = ev => {
+    imageBase64 = ev.target.result.split(',')[1];
+    preview.src = ev.target.result; preview.classList.remove('hidden');
+    dropzone.style.display = 'none';
+    analyzeWrap.classList.remove('hidden'); analyzeWrap.style.display = 'flex';
+    if (modelsReady) document.getElementById('analyzeBtn').disabled = false;
+  };
+  r.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════
+// TF.JS INGREDIENT DETECTION
+// ═══════════════════════════════════════════════
+document.getElementById('analyzeBtn').addEventListener('click', analyzeIngredients);
+
+async function analyzeIngredients() {
+  if (!imageBase64) return;
+  document.getElementById('analyzeBtn').disabled = true;
+  const loaderEl = document.getElementById('loader-scan');
+  loaderEl.classList.remove('hidden'); loaderEl.style.display = 'flex';
+
+  const imgEl = document.getElementById('preview');
+  const found = [];
+  const usedNames = new Set();
+
+  try {
+    if (cocoSsdModel) {
+      const detections = await cocoSsdModel.detect(imgEl);
+      detections
+        .filter(d => d.score > 0.3 && COCO_FOOD_MAP[d.class])
+        .forEach(d => {
+          const m = COCO_FOOD_MAP[d.class];
+          if (!usedNames.has(m.name)) { usedNames.add(m.name); found.push(m); }
+        });
+    }
+
+    if (mobilenetModel) {
+      const preds = await mobilenetModel.classify(imgEl, 20);
+      for (const p of preds) {
+        const m = mapMobileNetPrediction(p.className, p.probability);
+        if (m && !usedNames.has(m.name)) { usedNames.add(m.name); found.push(m); }
+      }
+    }
+  } catch(e) { console.warn('Detection error:', e); }
+
+  detectedIngredients = found.length >= 2 ? found : getDefaultIngredients();
+  loaderEl.classList.add('hidden');
+  showRecipePhase();
+}
+
+// ═══════════════════════════════════════════════
+// RECIPE GENERATION (Claude API)
+// ═══════════════════════════════════════════════
+async function showRecipePhase() {
+  setPhase(2);
+  const chips = document.getElementById('ingredient-chips');
+  chips.innerHTML = '';
+  detectedIngredients.forEach(i => chips.innerHTML += `<div class="chip"><span>${i.emoji}</span>${i.name}</div>`);
+  const loaderR = document.getElementById('loader-recipe');
+  loaderR.classList.remove('hidden'); loaderR.style.display = 'flex';
+  const ingList = detectedIngredients.map(i => i.name).join(', ');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:1200,
+        messages:[{role:'user', content:`Create a recipe using: ${ingList}.
+Respond ONLY with this JSON (no markdown):
+{"title":"Name","emoji":"🍝","time":"25 min","servings":"2 servings","difficulty":"Easy","steps":[{"instruction":"Short description max 12 words","action":"chop","ingredient":"onion","emoji":"🧅"}]}
+action MUST be one of: chop, fry, boil, mix, season, bake, grill, add, stir
+Include 5–7 steps using varied actions.`}]})
+    });
+    const d = await res.json();
+    recipeData = JSON.parse(d.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+  } catch(e) { recipeData = fallbackRecipe(detectedIngredients); }
+  loaderR.classList.add('hidden');
+  renderRecipe();
+}
+
+function fallbackRecipe(ings) {
+  return {title:'Quick Stir-Fry',emoji:'🥘',time:'20 min',servings:'2 servings',difficulty:'Easy',steps:[
+    {instruction:'Chop vegetables into bite-sized pieces',action:'chop',ingredient:ings[0]?.name||'vegetables',emoji:ings[0]?.emoji||'🥬'},
+    {instruction:'Heat oil in pan until shimmering',action:'fry',ingredient:'oil',emoji:'🫙'},
+    {instruction:'Add protein to hot pan',action:'add',ingredient:ings[1]?.name||'protein',emoji:ings[1]?.emoji||'🥩'},
+    {instruction:'Stir constantly for 3 minutes',action:'stir',ingredient:'mixture',emoji:'🥢'},
+    {instruction:'Season generously with salt and pepper',action:'season',ingredient:'seasoning',emoji:'🧂'},
+    {instruction:'Boil sauce for 2 minutes to thicken',action:'boil',ingredient:'sauce',emoji:'🥣'},
+    {instruction:'Mix all together and serve',action:'mix',ingredient:'dish',emoji:'🥘'},
+  ]};
+}
+
+function renderRecipe() {
+  document.getElementById('recipe-emoji').textContent = recipeData.emoji;
+  document.getElementById('recipe-title').textContent = recipeData.title;
+  document.getElementById('recipe-time').textContent = recipeData.time;
+  document.getElementById('recipe-servings').textContent = recipeData.servings;
+  document.getElementById('recipe-difficulty').textContent = recipeData.difficulty;
+  const ol = document.getElementById('recipe-steps');
+  ol.innerHTML = '';
+  recipeData.steps.forEach((s,i) => {
+    const m = ACTION_META[s.action]||ACTION_META.default;
+    ol.innerHTML += `<li><div class="step-num">${i+1}</div><div class="step-text">
+      <span style="display:inline-block;padding:2px 10px;border-radius:50px;font-size:11px;font-weight:800;background:${m.bg};color:${m.color};margin-right:6px">${m.label}</span>
+      ${s.emoji} <strong>${s.ingredient}</strong> — ${s.instruction}</div></li>`;
+  });
+  document.getElementById('recipe-card').classList.remove('hidden');
+  ['startGameBtn','regenBtn'].forEach(id=>{document.getElementById(id).classList.remove('hidden');document.getElementById(id).style.display='inline-flex';});
+}
+
+document.getElementById('regenBtn').addEventListener('click', async () => {
+  document.getElementById('recipe-card').classList.add('hidden');
+  ['startGameBtn','regenBtn'].forEach(id=>{document.getElementById(id).classList.add('hidden');document.getElementById(id).style.display='none';});
+  await showRecipePhase();
+});
+
+// ═══════════════════════════════════════════════
+// GAME ENGINE
+// ═══════════════════════════════════════════════
+document.getElementById('startGameBtn').addEventListener('click', startGame);
+
+function startGame() { setPhase(3); document.getElementById('result-card').classList.add('hidden'); document.getElementById('hud-total').textContent = recipeData.steps.length; launchGame(); }
+function replayCook() { document.getElementById('result-card').classList.add('hidden'); launchGame(); }
+function restartFull() {
+  setPhase(1); imageBase64=null; detectedIngredients=[]; recipeData=null;
+  preview.classList.add('hidden'); dropzone.style.display=''; analyzeWrap.classList.add('hidden');
+  document.getElementById('analyzeBtn').disabled = !modelsReady; imgInput.value='';
+}
+
+function launchGame() {
+  gameActive = true; cancelAnimationFrame(gameRAF);
+  const canvas = document.getElementById('minigame-canvas');
+  canvas.width = canvas.offsetWidth || 780; canvas.height = 340;
+  MG = {score:0, combo:1, stepIdx:0, steps:recipeData.steps, canvas, ctx:canvas.getContext('2d'), particles:[], stepComplete:false, transitionTimer:0};
+  bindCanvas(canvas); loadStep(); loop();
+}
+
+function loadStep() {
+  const step = MG.steps[MG.stepIdx];
+  const meta = ACTION_META[step.action] || ACTION_META.default;
+  const badge = document.getElementById('step-badge');
+  badge.textContent = meta.label; badge.style.background = meta.bg; badge.style.color = meta.color;
+  document.getElementById('step-instruction-text').innerHTML = `${step.emoji} <strong>${step.ingredient}</strong> — ${meta.desc}`;
+  document.getElementById('hud-step').textContent = MG.stepIdx + 1;
+  const W = MG.canvas.width, H = MG.canvas.height;
+  const cfg = {step, meta, W, H};
+  const map = {chop:initChop, fry:initFry, boil:initBoil, mix:initMix, stir:initMix, season:initSeason, bake:initBake, grill:initGrill, add:initAdd};
+  MG.mg = (map[step.action] || initAdd)(cfg);
+  MG.stepComplete = false;
+}
+
+function bindCanvas(c) {
+  const fresh = c.cloneNode(true);
+  c.parentNode.replaceChild(fresh, c);
+  MG.canvas = fresh; MG.ctx = fresh.getContext('2d');
+  fresh.style.display = 'block'; fresh.style.width = '100%'; fresh.style.touchAction = 'none';
+  function pos(e) {
+    const r = fresh.getBoundingClientRect();
+    const sx = fresh.width/r.width, sy = fresh.height/r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return {x:(src.clientX-r.left)*sx, y:(src.clientY-r.top)*sy};
+  }
+  fresh.addEventListener('mousedown',  e => MG.mg&&MG.mg.down&&MG.mg.down(pos(e)));
+  fresh.addEventListener('mousemove',  e => MG.mg&&MG.mg.move&&MG.mg.move(pos(e)));
+  fresh.addEventListener('mouseup',    e => MG.mg&&MG.mg.up&&MG.mg.up(pos(e)));
+  fresh.addEventListener('mouseleave', e => MG.mg&&MG.mg.up&&MG.mg.up(pos(e)));
+  fresh.addEventListener('touchstart', e => {e.preventDefault();MG.mg&&MG.mg.down&&MG.mg.down(pos(e));},{passive:false});
+  fresh.addEventListener('touchmove',  e => {e.preventDefault();MG.mg&&MG.mg.move&&MG.mg.move(pos(e));},{passive:false});
+  fresh.addEventListener('touchend',   e => {e.preventDefault();MG.mg&&MG.mg.up&&MG.mg.up({x:0,y:0});},{passive:false});
+}
+
+function loop() {
+  if (!gameActive) return;
+  const {ctx, canvas:cv} = MG;
+  if (!ctx) { gameRAF = requestAnimationFrame(loop); return; }
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle = '#0f0f1e'; ctx.fillRect(0,0,cv.width,cv.height);
+  if (MG.mg && MG.mg.draw) MG.mg.draw(ctx, cv.width, cv.height);
+  if (MG.mg && MG.mg.update && !MG.stepComplete) { if (MG.mg.update()) completeStep(); }
+  drawParticles(ctx);
+  if (MG.transitionTimer > 0) {
+    ctx.fillStyle = `rgba(6,214,160,${MG.transitionTimer/20*0.3})`;
+    ctx.fillRect(0,0,cv.width,cv.height); MG.transitionTimer--;
+  }
+  updateHUD();
+  gameRAF = requestAnimationFrame(loop);
+}
+
+function completeStep() {
+  if (MG.stepComplete) return; MG.stepComplete = true;
+  MG.score += 100 * MG.combo; MG.combo = Math.min(MG.combo+1, 8);
+  MG.transitionTimer = 18; spawnBurst(MG.canvas.width/2, MG.canvas.height/2, '#06D6A0', 24);
+  MG.stepIdx++;
+  if (MG.stepIdx >= MG.steps.length) setTimeout(showResult, 700);
+  else setTimeout(() => { loadStep(); bindCanvas(MG.canvas); }, 700);
+}
+
+function updateHUD() {
+  document.getElementById('hud-score').textContent = MG.score;
+  document.getElementById('hud-combo').textContent = `×${MG.combo}`;
+  document.getElementById('prog-fill').style.width = (MG.stepIdx / MG.steps.length * 100) + '%';
+}
+
+function spawnBurst(x, y, color, n=16) {
+  for (let i=0;i<n;i++) {
+    const a = (Math.PI*2/n)*i + Math.random()*.3, spd = 2.5 + Math.random()*4;
+    MG.particles.push({x, y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:45+Math.random()*20, maxLife:65, color, r:3+Math.random()*4});
+  }
+}
+function drawParticles(ctx) {
+  MG.particles = MG.particles.filter(p=>p.life>0);
+  MG.particles.forEach(p => {
+    ctx.globalAlpha = p.life/p.maxLife; ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.life--;
+  }); ctx.globalAlpha = 1;
+}
+
+function showResult() {
+  gameActive = false; cancelAnimationFrame(gameRAF);
+  const max = MG.steps.length*100*8, pct = Math.round((MG.score/max)*100);
+  const [stars,msg] = pct>=80?['⭐⭐⭐⭐⭐','Michelin-star worthy! 👨‍🍳']:pct>=60?['⭐⭐⭐⭐','Excellent cooking!']:pct>=40?['⭐⭐⭐','Pretty tasty!']:pct>=20?['⭐⭐','Keep practicing!']:['⭐','The kitchen needs you!'];
+  document.getElementById('result-emoji').textContent = recipeData.emoji;
+  document.getElementById('result-title').textContent = recipeData.title + ' — Done!';
+  document.getElementById('result-msg').textContent = msg;
+  document.getElementById('result-score').textContent = MG.score;
+  document.getElementById('result-stars').textContent = stars;
+  document.getElementById('result-card').classList.remove('hidden');
+  document.getElementById('result-card').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function rr(ctx, x, y, w, h, r) {
+  if (typeof r === 'number') r = [r,r,r,r];
+  const [tl,tr,br,bl] = r;
+  ctx.beginPath(); ctx.moveTo(x+tl,y); ctx.lineTo(x+w-tr,y); ctx.arcTo(x+w,y,x+w,y+tr,tr);
+  ctx.lineTo(x+w,y+h-br); ctx.arcTo(x+w,y+h,x+w-br,y+h,br);
+  ctx.lineTo(x+bl,y+h); ctx.arcTo(x,y+h,x,y+h-bl,bl);
+  ctx.lineTo(x,y+tl); ctx.arcTo(x,y,x+tl,y,tl); ctx.closePath();
+}
+
+function drawThermometer(ctx, x, y, h, temp, minT, maxT, zones) {
+  // zones: [{lo, hi, color}]
+  const bH = h * Math.min(1, Math.max(0, (temp - minT)/(maxT - minT)));
+  const baseY = y + h;
+  // Track
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; rr(ctx,x-7,y,14,h,7); ctx.fill();
+  // Zone highlights
+  zones.forEach(z => {
+    const zLo = h * (1 - (z.hi - minT)/(maxT - minT));
+    const zHi = h * (1 - (z.lo - minT)/(maxT - minT));
+    ctx.fillStyle = z.bg || z.color+'44';
+    ctx.fillRect(x-5, y+zLo, 10, zHi-zLo);
+  });
+  // Fill
+  let fillColor = '#3a86ff';
+  for (const z of zones) if (temp >= z.lo && temp <= z.hi) { fillColor = z.color; break; }
+  if (temp > zones[zones.length-1].hi) fillColor = '#FF2200';
+  ctx.fillStyle = fillColor; rr(ctx,x-5,baseY-bH,10,bH,[0,0,5,5]); ctx.fill();
+  // Bulb
+  ctx.fillStyle = fillColor; ctx.beginPath(); ctx.arc(x,baseY+7,13,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.stroke();
+  // Temp label
+  ctx.fillStyle = fillColor; ctx.font = 'bold 14px Nunito,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(Math.round(temp)+'°', x, baseY+28);
+  return fillColor;
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: CHOP — Pendulum knife timing
+// ═══════════════════════════════════════════════
+function initChop({step, meta, W, H}) {
+  const req = 7;
+  let chops = 0, t = 0, speed = 1.6, amplitude = W * 0.30;
+  let flashGood = 0, flashMiss = 0;
+  let chopPieces = [];
+  const tX = W/2, tY = H/2 + 8, tR = 48;
+  const TOL = 46;
+
+  return {
+    down(p) {
+      if (flashGood > 0 || flashMiss > 0) return;
+      const kx = tX + amplitude * Math.sin(t);
+      if (Math.abs(kx - tX) < TOL) {
+        chops++; flashGood = 14; speed = Math.min(speed + 0.3, 5.0);
+        amplitude = Math.max(amplitude * 0.97, W * 0.18);
+        for (let i = 0; i < 5; i++) {
+          chopPieces.push({
+            x: tX + (Math.random()-.5)*40, y: tY + (Math.random()-.5)*20,
+            vx:(Math.random()-.5)*6, vy:-4-Math.random()*4, life:55, r:6+Math.random()*8
+          });
+        }
+        spawnBurst(tX, tY, meta.color, 10);
+      } else {
+        flashMiss = 10;
+      }
+    },
+    update() {
+      t += speed * 0.038;
+      if (flashGood > 0) flashGood--;
+      if (flashMiss > 0) flashMiss--;
+      chopPieces = chopPieces.filter(p=>p.life>0);
+      chopPieces.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.25; p.vx*=0.96; p.life--; });
+      return chops >= req;
+    },
+    draw(ctx, W, H) {
+      const kx = tX + amplitude * Math.sin(t);
+      const inZone = Math.abs(kx - tX) < TOL;
+
+      // Cutting board
+      ctx.fillStyle = '#3d2010'; rr(ctx,W/2-165,H/2-60,330,128,14); ctx.fill();
+      ctx.fillStyle = '#4e2e18'; rr(ctx,W/2-157,H/2-53,314,114,10); ctx.fill();
+      ctx.strokeStyle = '#6a4020'; ctx.lineWidth = 2; ctx.stroke();
+      for (let i = 0; i < 10; i++) { // wood grain
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(W/2-140+i*30,H/2-48); ctx.lineTo(W/2-140+i*30,H/2+55); ctx.stroke();
+      }
+
+      // Target zone glow
+      ctx.fillStyle = inZone ? 'rgba(6,214,160,0.25)' : 'rgba(255,255,255,0.06)';
+      ctx.beginPath(); ctx.arc(tX, tY, TOL-6, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = inZone ? '#06D6A0' : 'rgba(255,255,255,0.12)'; ctx.lineWidth = 2;
+      ctx.setLineDash([4,4]); ctx.beginPath(); ctx.arc(tX,tY,TOL+4,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+
+      // Ingredient (shrinks as you chop)
+      if (chops < req) {
+        const r = tR - chops * 4;
+        ctx.fillStyle = meta.color; ctx.beginPath(); ctx.arc(tX,tY,r,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.font = `${Math.max(18, 36-chops*3)}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(step.emoji, tX, tY);
+        // Chop lines through ingredient
+        for (let i = 0; i < chops; i++) {
+          const cx = tX - r + (i+0.5)*(r*2/chops) + (Math.random()*4-2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(cx, tY-r); ctx.lineTo(cx, tY+r); ctx.stroke();
+        }
+      }
+
+      // Flying pieces
+      chopPieces.forEach(p => {
+        ctx.globalAlpha = p.life/55 * 0.85;
+        ctx.fillStyle = meta.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+        ctx.font = '12px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(step.emoji, p.x, p.y);
+      }); ctx.globalAlpha = 1;
+
+      // Pendulum arm
+      const kAngle = Math.asin(Math.max(-1,Math.min(1,(kx-W/2)/amplitude)));
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(W/2,18); ctx.lineTo(kx, H/2-78); ctx.stroke();
+
+      // Knife
+      ctx.save(); ctx.translate(kx, H/2-60); ctx.rotate(kAngle + Math.PI*0.05);
+      if (inZone) { ctx.shadowColor = '#06D6A0'; ctx.shadowBlur = 20; }
+      // blade
+      ctx.fillStyle = flashGood > 0 ? '#06D6A0' : '#d8d8d8';
+      ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(7,-6); ctx.lineTo(5,30); ctx.lineTo(-5,30); ctx.lineTo(-7,-6); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+      // handle
+      ctx.fillStyle = '#7a3510'; ctx.fillRect(-6,30,12,20);
+      ctx.fillStyle = '#5a2508'; ctx.beginPath(); ctx.arc(0,36,4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,44,4,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0; ctx.restore();
+
+      // Miss flash
+      if (flashMiss > 0) {
+        ctx.fillStyle = `rgba(239,71,111,${flashMiss/10*0.35})`; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = '#EF476F'; ctx.font = 'bold 22px Nunito,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('MISS! ✗', W/2, 60);
+      }
+      if (flashGood > 0) {
+        ctx.fillStyle = '#06D6A0'; ctx.font = 'bold 22px Nunito,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('NICE! ✓', W/2, 60);
+      }
+
+      // Progress ring
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(tX,tY,tR+20,-Math.PI/2,Math.PI*1.5); ctx.stroke();
+      ctx.strokeStyle = meta.color; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(tX,tY,tR+20,-Math.PI/2,-Math.PI/2+Math.PI*2*(chops/req)); ctx.stroke();
+
+      // Label
+      ctx.fillStyle = inZone ? '#06D6A0' : '#fff';
+      ctx.font = 'bold 15px Nunito,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(inZone ? '⚡ Click NOW!' : `${chops}/${req} chops — time your click when it's green!`, W/2, H-12);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: FRY — Temperature management
+// ═══════════════════════════════════════════════
+function initFry({step, meta, W, H}) {
+  const COLD=0, WARM=80, PERF_LO=130, PERF_HI=175, HOT=195, BURN=215;
+  let temp = 22, holding = false, cookProgress = 0, t = 0;
+  let sizzles = [], smoke = [], flames = [];
+
+  const thermX = 38, thermY = 24, thermH = H - 80;
+
+  return {
+    down(p) { if (p.y > H - 70) holding = true; },
+    up() { holding = false; },
+    update() {
+      t++;
+      if (holding) temp = Math.min(BURN+12, temp + 2.0);
+      else temp = Math.max(18, temp - (temp > 80 ? 0.75 : 0.35));
+
+      const inPerfect = temp >= PERF_LO && temp <= PERF_HI;
+      const isBurning = temp > BURN;
+
+      if (inPerfect) {
+        cookProgress = Math.min(100, cookProgress + 0.65);
+        if (Math.random() < 0.10) sizzles.push({x:W*0.55+(Math.random()-.5)*70,y:H/2+4+Math.random()*16,vx:(Math.random()-.5)*2.5,vy:-2-Math.random()*1.8,life:24});
+      } else if (isBurning) {
+        cookProgress = Math.max(0, cookProgress - 1.2);
+        if (Math.random() < 0.18) smoke.push({x:W*0.55+(Math.random()-.5)*50,y:H/2-38,vx:(Math.random()-.5)*0.8,vy:-1.8-Math.random(),r:7+Math.random()*9,life:55});
+        if (Math.random() < 0.12) flames.push({x:W*0.55+(Math.random()-.5)*40,y:H/2-15,h:12+Math.random()*18,life:14});
+      } else if (temp > HOT && Math.random() < 0.07) {
+        smoke.push({x:W*0.55+(Math.random()-.5)*40,y:H/2-30,vx:(Math.random()-.5)*0.5,vy:-1.2,r:5,life:38});
+      }
+      if (temp > WARM && Math.random() < 0.06 && !isBurning) sizzles.push({x:W*0.55+(Math.random()-.5)*55,y:H/2+6+Math.random()*14,vx:(Math.random()-.5)*2,vy:-1.5-Math.random(),life:18});
+
+      sizzles = sizzles.filter(s=>s.life>0); sizzles.forEach(s=>{s.x+=s.vx;s.y+=s.vy;s.life--;});
+      smoke   = smoke.filter(s=>s.life>0);   smoke.forEach(s=>{s.x+=s.vx;s.y+=s.vy;s.r+=0.35;s.life--;});
+      flames  = flames.filter(f=>f.life>0);  flames.forEach(f=>f.life--);
+      return cookProgress >= 100;
+    },
+    draw(ctx, W, H) {
+      const inPerfect = temp >= PERF_LO && temp <= PERF_HI;
+      const isBurning = temp > BURN;
+      const isHot = temp > HOT;
+
+      // Thermometer
+      drawThermometer(ctx, thermX, thermY, thermH, temp, 0, BURN+12, [
+        {lo:PERF_LO, hi:PERF_HI, color:'#06D6A0', bg:'rgba(6,214,160,0.2)'},
+        {lo:WARM,    hi:PERF_LO, color:'#FFD166', bg:'rgba(255,209,102,0.12)'},
+        {lo:PERF_HI, hi:HOT,     color:'#FF8C00', bg:'rgba(255,140,0,0.12)'},
+      ]);
+      // Zone labels
+      ctx.font = '9px Nunito,sans-serif'; ctx.fillStyle = '#06D6A0'; ctx.textAlign = 'left';
+      const perfLoY = thermY + thermH*(1-(PERF_LO/(BURN+12)));
+      const perfHiY = thermY + thermH*(1-(PERF_HI/(BURN+12)));
+      ctx.fillText('↑ PERFECT', thermX+18, perfLoY+4);
+      ctx.fillText('↓ PERFECT', thermX+18, perfHiY+4);
+      ctx.fillStyle = '#FF8C00'; ctx.fillText('↑ TOO HOT', thermX+18, thermY + thermH*(1-(HOT/(BURN+12)))+4);
+
+      // Stove body
+      ctx.fillStyle = '#1c1c1c'; rr(ctx,W*0.38-8,H/2+22,W*0.42+16,76,10); ctx.fill();
+
+      // Burner glow
+      const glow = Math.max(0, (temp-WARM)/(BURN-WARM));
+      if (holding || temp > WARM) {
+        const grad = ctx.createRadialGradient(W*0.55, H/2+60, 0, W*0.55, H/2+60, 60);
+        grad.addColorStop(0, `rgba(255,${Math.floor(160*(1-glow))},0,${glow*0.9})`);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad; ctx.beginPath(); ctx.ellipse(W*0.55, H/2+60, 58, 18, 0, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.strokeStyle = `rgba(255,${Math.floor(120*(1-glow))},0,${0.3+glow*0.7})`;
+      ctx.lineWidth = holding ? 7 : 3;
+      ctx.beginPath(); ctx.ellipse(W*0.55, H/2+62, 54, 17, 0, 0, Math.PI*2); ctx.stroke();
+
+      // Pan shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(W*0.55+6, H/2+66, 80, 15, 0, 0, Math.PI*2); ctx.fill();
+
+      // Pan body
+      ctx.fillStyle = '#3c3c3c'; rr(ctx,W*0.38,H/2-38,W*0.34,100,[6,6,18,18]); ctx.fill();
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.stroke();
+
+      // Pan interior — color shows cooking progress
+      const interiorColor = isBurning ? '#0d0700' : cookProgress > 75 ? '#2e1f0e' : temp > WARM ? '#201810' : '#1a1a1a';
+      ctx.fillStyle = interiorColor; rr(ctx,W*0.38+12,H/2-26,W*0.34-24,80,[4,4,12,12]); ctx.fill();
+
+      // Oil sheen
+      if (temp > WARM) {
+        ctx.fillStyle = `rgba(220,180,40,${Math.min(0.28,(temp-WARM)/(PERF_LO-WARM)*0.28)})`;
+        rr(ctx,W*0.38+14,H/2-24,W*0.34-28,76,[3,3,10,10]); ctx.fill();
+      }
+
+      // Food — raw → cooked → charred
+      const rawG = Math.max(0, 1 - cookProgress/60);
+      const r = Math.floor(255*(0.6+rawG*0.4)), g = Math.floor(100*(1-rawG)*0.5+rawG*60), b = Math.floor(rawG*80);
+      ctx.fillStyle = isBurning&&cookProgress<30 ? '#1a0a00' : `rgb(${r},${g},${b})`;
+      ctx.beginPath(); ctx.ellipse(W*0.55, H/2+12, 32, 22, 0, 0, Math.PI*2); ctx.fill();
+      ctx.font = '28px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(step.emoji, W*0.55, H/2+12);
+
+      // Sizzle sparks
+      sizzles.forEach(s=>{ctx.globalAlpha=s.life/24;ctx.fillStyle='#FFD166';ctx.beginPath();ctx.arc(s.x,s.y,2.5,0,Math.PI*2);ctx.fill();});
+      ctx.globalAlpha=1;
+
+      // Smoke
+      smoke.forEach(s=>{ctx.globalAlpha=s.life/55*0.55;ctx.fillStyle='#888';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();}); ctx.globalAlpha=1;
+
+      // Flames
+      flames.forEach(f=>{
+        ctx.globalAlpha=f.life/14;
+        ctx.fillStyle=`hsl(${25+Math.random()*30},100%,${45+Math.random()*25}%)`;
+        ctx.beginPath(); ctx.ellipse(f.x,f.y-f.h/2,5,f.h/2,0,0,Math.PI*2); ctx.fill();
+      }); ctx.globalAlpha=1;
+
+      // Pan handle
+      ctx.fillStyle='#6a3212'; ctx.fillRect(W*0.38+W*0.34,H/2+20,52,14);
+      ctx.beginPath(); ctx.arc(W*0.38+W*0.34+52+11,H/2+27,11,0,Math.PI*2); ctx.fill();
+
+      // Cook progress bar
+      const bX=W*0.38, bY=H/2-52, bW=W*0.34;
+      ctx.fillStyle='rgba(255,255,255,0.1)'; rr(ctx,bX,bY,bW,9,4); ctx.fill();
+      ctx.fillStyle = isBurning?'#FF2200':inPerfect?'#06D6A0':'#FFD166';
+      rr(ctx,bX,bY,bW*(cookProgress/100),9,4); ctx.fill();
+      ctx.fillStyle='#aaa'; ctx.font='10px Nunito,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText('Cook: '+Math.round(cookProgress)+'%', bX, bY-10);
+
+      // Heat button
+      ctx.fillStyle = holding?'#FF6B35':'#2a2a3a'; rr(ctx,W/2-95,H-55,190,42,21); ctx.fill();
+      ctx.strokeStyle = holding?'#FFD166':'#555'; ctx.lineWidth=2; rr(ctx,W/2-95,H-55,190,42,21); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 14px Nunito,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(holding?'🔥 Heating…':'🔥 Hold to Heat', W/2, H-34);
+
+      // Status
+      const msg = isBurning?'🚨 BURNING — Release heat!' : isHot?'⚠️ Too hot — ease off!' : inPerfect?'✅ Perfect! Keep it here!' : temp>WARM?'↑ Getting warmer…':'❄️ Too cold — hold to heat!';
+      ctx.fillStyle = isBurning?'#FF2200':isHot?'#FF8C00':inPerfect?'#06D6A0':'#ccc';
+      ctx.font='bold 13px Nunito,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+      ctx.fillText(msg, W/2, H-60);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: BOIL — Heat to boil then stir
+// ═══════════════════════════════════════════════
+function initBoil({step, meta, W, H}) {
+  let temp=20, holding=false, phase=0, stirs=0, reqStirs=3;
+  let t=0, bubbles=[], foam=[], trail=[], isDown=false, lastA=null, arc=0;
+  const pot={x:W/2,y:H/2-12,r:78};
+  function ga(p){return Math.atan2(p.y-pot.y,p.x-pot.x);}
+
+  return {
+    down(p) {
+      if (phase===0 && p.y > H-72) holding=true;
+      if (phase===1) { isDown=true; lastA=ga(p); arc=0; }
+    },
+    move(p) {
+      if (phase===1 && isDown) {
+        trail.push({x:p.x,y:p.y,life:22});
+        const a=ga(p); let da=a-lastA;
+        if(da>Math.PI)da-=Math.PI*2; if(da<-Math.PI)da+=Math.PI*2;
+        arc+=da;
+        if(Math.abs(arc)>=Math.PI*2){stirs++;arc=0;spawnBurst(pot.x,pot.y,meta.color,8);}
+        lastA=a;
+      }
+    },
+    up() { holding=false; isDown=false; lastA=null; },
+    update() {
+      t++;
+      if (phase===0) {
+        if(holding) temp=Math.min(102,temp+1.4); else temp=Math.max(18,temp-0.5);
+        if(temp>=100) { phase=1; temp=100; spawnBurst(W/2,H/2,meta.color,18); }
+        if(temp>60 && Math.random()<0.1) bubbles.push({x:pot.x+(Math.random()-.5)*80,y:pot.y+25,r:2.5+Math.random()*4,vy:-0.8-Math.random()*temp/50,life:20+Math.random()*25});
+        if(temp>80 && Math.random()<0.15) foam.push({x:pot.x+(Math.random()-.5)*70,y:pot.y-40,r:3+Math.random()*5,vx:(Math.random()-.5),vy:-0.6,life:30});
+      }
+      bubbles=bubbles.filter(b=>b.life>0); bubbles.forEach(b=>{b.y+=b.vy;b.r*=0.98;b.life--;});
+      foam=foam.filter(f=>f.life>0); foam.forEach(f=>{f.x+=f.vx;f.y+=f.vy;f.life--;});
+      trail=trail.filter(t=>t.life>0); trail.forEach(t=>t.life--);
+      if(phase===1) return stirs>=reqStirs;
+      return false;
+    },
+    draw(ctx,W,H) {
+      const prog=temp/102;
+      // Pot shadow
+      ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(pot.x+6,pot.y+pot.r+12,pot.r-6,12,0,0,Math.PI*2); ctx.fill();
+      // Pot outer
+      ctx.fillStyle='#555'; rr(ctx,pot.x-pot.r-4,pot.y-pot.r+4,pot.r*2+8,pot.r*2+20,[6,6,18,18]); ctx.fill();
+      // Water fill with clip
+      ctx.save();
+      ctx.beginPath(); rr(ctx,pot.x-pot.r+4,pot.y+pot.r-prog*pot.r*1.8,pot.r*2-8,pot.r*1.8+12,[0,0,12,12]); ctx.clip();
+      const wGrad=ctx.createLinearGradient(0,pot.y-pot.r,0,pot.y+pot.r);
+      wGrad.addColorStop(0,temp>95?'#FF6B00':temp>70?'#FF9A00':temp>40?'#FFD166':'#3a86ff');
+      wGrad.addColorStop(1,temp>95?'#CC2200':temp>70?'#CC6600':temp>40?'#CC9900':'#0055cc');
+      ctx.fillStyle=wGrad; ctx.fillRect(pot.x-pot.r,pot.y-pot.r,pot.r*2,pot.r*2+20);
+      ctx.restore();
+      ctx.strokeStyle='#777'; ctx.lineWidth=3; rr(ctx,pot.x-pot.r-4,pot.y-pot.r+4,pot.r*2+8,pot.r*2+20,[6,6,18,18]); ctx.stroke();
+      // Handles
+      ctx.fillStyle='#888'; ctx.fillRect(pot.x-pot.r-24,pot.y-18,22,20); ctx.fillRect(pot.x+pot.r+2,pot.y-18,22,20);
+      // Rim
+      ctx.fillStyle='#666'; ctx.fillRect(pot.x-pot.r-6,pot.y-pot.r-2,pot.r*2+12,12);
+      // Food
+      ctx.font='32px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(step.emoji,pot.x,pot.y);
+
+      // Bubbles
+      bubbles.forEach(b=>{ctx.globalAlpha=b.life/45;ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.stroke();}); ctx.globalAlpha=1;
+      foam.forEach(f=>{ctx.globalAlpha=f.life/30*0.8;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,Math.PI*2);ctx.fill();}); ctx.globalAlpha=1;
+
+      // Phase 0: heat gauge + button
+      if (phase===0) {
+        const bX=W/2-110,bY=H-52,bW=220;
+        ctx.fillStyle='rgba(255,255,255,0.1)'; rr(ctx,bX,bY-18,bW,10,5); ctx.fill();
+        ctx.fillStyle=temp>95?'#FF6B35':temp>60?'#FFD166':'#3a86ff'; rr(ctx,bX,bY-18,bW*prog,10,5); ctx.fill();
+        ctx.fillStyle=holding?'#FF6B35':'#2a2a3a'; rr(ctx,bX,bY,bW,38,19); ctx.fill();
+        ctx.strokeStyle=holding?'#FFD166':'#555'; ctx.lineWidth=2; rr(ctx,bX,bY,bW,38,19); ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.font='bold 14px Nunito,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(holding?'🔥 Heating…':'🔥 Hold to Boil!', W/2, bY+19);
+        ctx.fillStyle=temp>95?'#FF6B35':'#ccc'; ctx.font='bold 13px Nunito,sans-serif'; ctx.textBaseline='alphabetic';
+        ctx.fillText(temp>=100?'💧 Boiling! Let go and stir!':Math.round(temp)+'°C — '+(100-Math.round(temp))+'° to boil', W/2, H-56);
+      }
+
+      // Phase 1: stir mechanic
+      if (phase===1) {
+        // Stir guide ring
+        ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=2; ctx.setLineDash([5,5]);
+        ctx.beginPath(); ctx.arc(pot.x,pot.y,pot.r-10,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+        // Trail
+        if(trail.length>1){
+          ctx.beginPath(); ctx.moveTo(trail[0].x,trail[0].y);
+          trail.forEach((p,i)=>{if(i>0)ctx.lineTo(p.x,p.y);});
+          ctx.strokeStyle=meta.color; ctx.lineWidth=5; ctx.lineCap='round'; ctx.globalAlpha=0.8; ctx.stroke(); ctx.globalAlpha=1;
+        }
+        // Spoon hint
+        if(!isDown){const an=Date.now()/600;ctx.font='22px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🥄',pot.x+(pot.r-16)*Math.cos(an),pot.y+(pot.r-16)*Math.sin(an));}
+        // Stir progress
+        for(let i=0;i<reqStirs;i++){
+          ctx.fillStyle=i<stirs?meta.color:'rgba(255,255,255,0.15)';
+          ctx.beginPath(); ctx.arc(W/2-((reqStirs-1)*18)+i*36,H-30,10,0,Math.PI*2); ctx.fill();
+        }
+        ctx.fillStyle='#fff'; ctx.font='bold 14px Nunito,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+        ctx.fillText(`${stirs}/${reqStirs} stirs — draw circles to prevent sticking!`, W/2, H-50);
+      }
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: MIX / STIR — Full circle detection
+// ═══════════════════════════════════════════════
+function initMix({step,meta,W,H}){
+  let circles=0,req=3,trail=[],isDown=false,lastA=null,arc=0;
+  const bowl={x:W/2,y:H/2-6,r:80};
+  function ga(p){return Math.atan2(p.y-bowl.y,p.x-bowl.x);}
+  return{
+    down(p){isDown=true;lastA=ga(p);arc=0;},
+    move(p){
+      if(!isDown)return;trail.push({x:p.x,y:p.y,life:30});
+      const a=ga(p);let da=a-lastA;
+      if(da>Math.PI)da-=Math.PI*2;if(da<-Math.PI)da+=Math.PI*2;
+      arc+=da;
+      if(Math.abs(arc)>=Math.PI*2){circles++;arc=0;spawnBurst(bowl.x,bowl.y,meta.color,10);}
+      lastA=a;
+    },
+    up(){isDown=false;lastA=null;},
+    update(){return circles>=req;},
+    draw(ctx,W,H){
+      ctx.fillStyle='rgba(0,0,0,0.28)';ctx.beginPath();ctx.ellipse(bowl.x+8,bowl.y+bowl.r+14,bowl.r-8,13,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#c8a870';ctx.beginPath();ctx.arc(bowl.x,bowl.y,bowl.r+16,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff8ee';ctx.beginPath();ctx.arc(bowl.x,bowl.y,bowl.r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(220,160,50,0.35)';ctx.beginPath();ctx.arc(bowl.x,bowl.y,bowl.r-12,0,Math.PI*2);ctx.fill();
+      ctx.font='40px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(step.emoji,bowl.x,bowl.y);
+      trail=trail.filter(t=>t.life>0);
+      if(trail.length>1){
+        ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);
+        trail.forEach((t,i)=>{if(i>0)ctx.lineTo(t.x,t.y);t.life--;});
+        ctx.strokeStyle=meta.color;ctx.lineWidth=5;ctx.lineCap='round';ctx.globalAlpha=0.8;ctx.stroke();ctx.globalAlpha=1;
+      }
+      ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1.5;ctx.setLineDash([6,6]);
+      ctx.beginPath();ctx.arc(bowl.x,bowl.y,bowl.r+7,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+      if(!isDown){const t=Date.now()/700;ctx.font='22px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🥄',bowl.x+(bowl.r-10)*Math.cos(t),bowl.y+(bowl.r-10)*Math.sin(t));}
+      ctx.fillStyle='#fff';ctx.font='bold 15px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      ctx.fillText(`${circles}/${req} circles — keep moving in a loop!`,W/2,H-14);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: SEASON — Balance meter with overshoot
+// ═══════════════════════════════════════════════
+function initSeason({step,meta,W,H}){
+  // -100 = under-seasoned, 0 = perfect, +100 = over-seasoned
+  let level=-100, vel=0, req=1, timeInZone=0, shakeT=0, taps=0;
+  let speckles=[], particles2=[];
+  const sx=W/2, sy=H/2-28;
+  const ZONE_LO=-18, ZONE_HI=18;
+
+  return{
+    down(p){
+      if(Math.abs(p.x-sx)<48&&Math.abs(p.y-sy)<65&&level<80){
+        vel+=18; shakeT=10; taps++;
+        for(let i=0;i<6;i++) speckles.push({x:sx+(Math.random()-.5)*16,y:sy-55,vx:(Math.random()-.5)*3.5,vy:-2.5-Math.random()*2.5,life:42,r:1.5+Math.random()*2});
+        spawnBurst(sx,sy+60,meta.color,5);
+      }
+    },
+    update(){
+      if(shakeT>0)shakeT--;
+      vel*=0.88; level=Math.min(100,level+vel*0.08);
+      if(level>ZONE_LO&&level<ZONE_HI) timeInZone++;
+      else timeInZone=0;
+      speckles=speckles.filter(s=>s.life>0);
+      speckles.forEach(s=>{s.x+=s.vx;s.y+=s.vy;s.vy+=0.1;s.life--;});
+      return timeInZone>=45;
+    },
+    draw(ctx,W,H){
+      // Dish
+      ctx.fillStyle='#fff3e0';ctx.beginPath();ctx.ellipse(sx,H/2+50,110,34,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#e0c8a0';ctx.lineWidth=3;ctx.stroke();
+      ctx.fillStyle='#f5e0c0';ctx.beginPath();ctx.ellipse(sx,H/2+46,90,26,0,0,Math.PI*2);ctx.fill();
+      ctx.font='26px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(step.emoji,sx,H/2+46);
+
+      // Speckles (salt on food)
+      speckles.forEach(s=>{ctx.globalAlpha=s.life/42;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x,s.y+(H/2+46-10),s.r,0,Math.PI*2);ctx.fill();}); ctx.globalAlpha=1;
+
+      // Shaker
+      const wob=Math.sin(shakeT*1.8)*shakeT*1.2;
+      ctx.fillStyle='#f0f0f2';rr(ctx,sx-28+wob,sy-48,56,95,14);ctx.fill();
+      ctx.strokeStyle='#d0d0d8';ctx.lineWidth=2;rr(ctx,sx-28+wob,sy-48,56,95,14);ctx.stroke();
+      ctx.fillStyle=meta.color;rr(ctx,sx-25+wob,sy-48,50,26,[12,12,0,0]);ctx.fill();
+      ctx.fillStyle='#999';
+      for(let xi=0;xi<3;xi++)for(let yi=0;yi<2;yi++){ctx.beginPath();ctx.arc(sx-8+xi*8+wob,sy-38+yi*9,2.5,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle='rgba(0,0,0,0.05)';ctx.fillRect(sx-28+wob,sy-4,56,20);
+
+      // Balance meter
+      const mX=W/2-130,mY=H/2-115,mW=260,mH=28;
+      // Track
+      const grad=ctx.createLinearGradient(mX,0,mX+mW,0);
+      grad.addColorStop(0,'#3a86ff'); grad.addColorStop(0.38,'#06D6A0'); grad.addColorStop(0.5,'#06D6A0'); grad.addColorStop(0.62,'#06D6A0'); grad.addColorStop(1,'#EF476F');
+      ctx.fillStyle=grad; rr(ctx,mX,mY,mW,mH,mH/2); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;rr(ctx,mX,mY,mW,mH,mH/2);ctx.stroke();
+
+      // Zone highlight
+      const zX=mX+mW*(ZONE_LO+100)/200, zW=mW*(ZONE_HI-ZONE_LO)/200;
+      ctx.strokeStyle='#fff'; ctx.lineWidth=3; rr(ctx,zX,mY-3,zW,mH+6,4); ctx.stroke();
+
+      // Needle
+      const needleX=mX+mW*(level+100)/200;
+      const inZone=level>=ZONE_LO&&level<=ZONE_HI;
+      ctx.fillStyle=inZone?'#fff':'#FFD166';
+      ctx.beginPath();ctx.moveTo(needleX,mY-10);ctx.lineTo(needleX+8,mY-24);ctx.lineTo(needleX-8,mY-24);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(needleX,mY+mH+10);ctx.lineTo(needleX+8,mY+mH+24);ctx.lineTo(needleX-8,mY+mH+24);ctx.closePath();ctx.fill();
+      ctx.fillStyle=inZone?'#fff':'#FFD166';ctx.beginPath();ctx.arc(needleX,mY+mH/2,6,0,Math.PI*2);ctx.fill();
+
+      // Labels
+      ctx.font='10px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      ctx.fillStyle='#3a86ff';ctx.fillText('UNDER-SEASONED',mX+40,mY-32);
+      ctx.fillStyle='#06D6A0';ctx.fillText('PERFECT',mX+mW/2,mY-32);
+      ctx.fillStyle='#EF476F';ctx.fillText('OVER-SEASONED',mX+mW-40,mY-32);
+
+      // Ring progress around shaker
+      ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=6;ctx.beginPath();ctx.arc(sx,sy,50,-Math.PI/2,Math.PI*1.5);ctx.stroke();
+      ctx.strokeStyle=meta.color;ctx.lineWidth=6;
+      const ringP=Math.max(0,Math.min(1,(level+100)/200));
+      ctx.beginPath();ctx.arc(sx,sy,50,-Math.PI/2,-Math.PI/2+Math.PI*2*ringP);ctx.stroke();
+
+      ctx.fillStyle=inZone?'#06D6A0':'#fff';
+      ctx.font='bold 14px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      const msg=level>=ZONE_HI?'⚠️ Too much! Stop!':inZone?'✅ Perfect! Hold steady…':'🧂 Shake to season — stop at the green zone!';
+      ctx.fillText(msg,W/2,H-14);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: BAKE — Preheat + hold in window
+// ═══════════════════════════════════════════════
+function initBake({step,meta,W,H}){
+  const cx=W*0.72, cy=H/2+8, dr=52;
+  let angle=-Math.PI*0.75, dragging=false, held=0, ovenTemp=0;
+  const target=-Math.PI*0.08+Math.random()*Math.PI*0.28;
+  const tol=0.20;
+  function adiff(a,b){let d=a-b;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return Math.abs(d);}
+  const onTarget=()=>adiff(angle,target)<tol;
+  return{
+    down(p){const dx=p.x-cx,dy=p.y-cy;if(Math.sqrt(dx*dx+dy*dy)<dr+24)dragging=true;},
+    move(p){
+      if(!dragging)return;
+      let a=Math.atan2(p.y-cy,p.x-cx);
+      a=Math.max(-Math.PI*0.85,Math.min(Math.PI*0.05,a));angle=a;
+    },
+    up(){dragging=false;},
+    update(){
+      const on=onTarget();
+      if(on){ovenTemp=Math.min(220,ovenTemp+3);held++;}
+      else{ovenTemp=Math.max(0,ovenTemp-2);held=0;}
+      return held>55;
+    },
+    draw(ctx,W,H){
+      const on=onTarget(), prog=ovenTemp/220;
+      const browning=Math.min(1,held/55);
+
+      // Oven body
+      ctx.fillStyle='#1e1e1e'; rr(ctx,W*0.1-4,H/2-88,W*0.52+8,170,14); ctx.fill();
+      ctx.strokeStyle='#2a2a2a';ctx.lineWidth=3;rr(ctx,W*0.1-4,H/2-88,W*0.52+8,170,14);ctx.stroke();
+
+      // Oven window
+      const winGlow=prog*0.6+browning*0.3;
+      ctx.fillStyle=`rgba(255,${Math.floor(80+60*prog)},0,${0.06+winGlow})`;
+      rr(ctx,W*0.1+12,H/2-72,W*0.52-24,106,8);ctx.fill();
+      ctx.strokeStyle='#444';ctx.lineWidth=2;rr(ctx,W*0.1+12,H/2-72,W*0.52-24,106,8);ctx.stroke();
+
+      // Oven element glow lines
+      if(ovenTemp>60){
+        ctx.strokeStyle=`rgba(255,60,0,${Math.min(0.8,ovenTemp/220*0.8)})`;ctx.lineWidth=4;
+        for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(W*0.1+20,H/2-50+i*36);ctx.lineTo(W*0.1+W*0.52-24,H/2-50+i*36);ctx.stroke();}
+      }
+
+      // Food inside oven — browning
+      const h1=Math.floor(240*(1-browning*0.5)), h2=Math.floor(220*(1-browning));
+      ctx.fillStyle=`rgb(${Math.floor(220-browning*120)},${Math.floor(180-browning*120)},${Math.floor(100-browning*80)})`;
+      ctx.beginPath();ctx.ellipse(W*0.1+W*0.26,H/2-22,45,28,0,0,Math.PI*2);ctx.fill();
+      ctx.font='32px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(step.emoji,W*0.1+W*0.26,H/2-22);
+
+      // Oven temp indicator strip
+      const sX=W*0.1+12,sY=H/2+46,sW=W*0.52-24;
+      ctx.fillStyle='rgba(255,255,255,0.07)';rr(ctx,sX,sY,sW,10,5);ctx.fill();
+      ctx.fillStyle=on?'#06D6A0':ovenTemp>100?'#FF8C00':'#FF6B35';
+      rr(ctx,sX,sY,sW*prog,10,5);ctx.fill();
+      ctx.fillStyle='#aaa';ctx.font='10px Nunito,sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';
+      ctx.fillText(Math.round(ovenTemp)+'°C',sX+6,sY+5);
+
+      // Handle
+      ctx.fillStyle='#888';ctx.fillRect(W*0.1+W*0.52*0.2,H/2+64,W*0.52*0.6,12);
+
+      // Dial bg
+      ctx.fillStyle='#2a2a2a';ctx.beginPath();ctx.arc(cx,cy,dr,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#444';ctx.lineWidth=3;ctx.stroke();
+
+      // Target arc
+      ctx.strokeStyle='rgba(6,214,160,0.3)';ctx.lineWidth=12;ctx.beginPath();ctx.arc(cx,cy,dr+16,target-tol,target+tol);ctx.stroke();
+      ctx.strokeStyle='#06D6A0';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,dr+16,target-tol,target+tol);ctx.stroke();
+
+      // Tick marks
+      for(let i=0;i<=12;i++){
+        const a=-Math.PI*0.85+i*(Math.PI*0.90/12);
+        ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=i%3===0?2.5:1.5;
+        ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*(dr-8),cy+Math.sin(a)*(dr-8));ctx.lineTo(cx+Math.cos(a)*(dr-18),cy+Math.sin(a)*(dr-18));ctx.stroke();
+      }
+
+      // Pointer
+      ctx.fillStyle=on?'#06D6A0':'#FF6B35';
+      ctx.beginPath();ctx.moveTo(cx+Math.cos(angle)*(dr-10),cy+Math.sin(angle)*(dr-10));
+      ctx.lineTo(cx+Math.cos(angle+0.3)*(dr-28),cy+Math.sin(angle+0.3)*(dr-28));
+      ctx.lineTo(cx+Math.cos(angle-0.3)*(dr-28),cy+Math.sin(angle-0.3)*(dr-28));
+      ctx.closePath();ctx.fill();
+      ctx.fillStyle='#111';ctx.beginPath();ctx.arc(cx,cy,9,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#555';ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fill();
+
+      // Label
+      const lbl=on?`🔒 Hold! ${Math.round(Math.min(held,55)/55*100)}%`:`Drag dial to the green zone`;
+      ctx.fillStyle=on?'#06D6A0':'#fff';ctx.font='bold 14px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      ctx.fillText(lbl,W/2,H-14);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: GRILL — Two-phase flip mechanic
+// ═══════════════════════════════════════════════
+function initGrill({step,meta,W,H}){
+  let phase=0; // 0=side1, 1=flipping, 2=side2
+  let fx=W/2,fy=H/2,isDrag=false;
+  const gX=W/2-130,gY=H/2-58,gW=260,gH=116,BARS=7;
+  const side1=new Set(), side2=new Set();
+  let flipTimer=0, flipAnim=0, flipMsg=0;
+  const BARS_NEEDED=BARS;
+
+  function check(set){
+    for(let i=0;i<BARS;i++){
+      const bx=gX+i*(gW/BARS);
+      if(fx>bx&&fx<bx+gW/BARS&&fy>gY&&fy<gY+gH){
+        if(!set.has(i)){set.add(i);spawnBurst(fx,fy,'#FF6B00',5);}
+      }
+    }
+  }
+  return{
+    down(p){if(phase!==1){isDrag=true;fx=p.x;fy=p.y;if(phase===0)check(side1);else if(phase===2)check(side2);}},
+    move(p){if(!isDrag)return;fx=p.x;fy=p.y;if(phase===0)check(side1);else if(phase===2)check(side2);},
+    up(){isDrag=false;},
+    update(){
+      if(phase===0&&side1.size>=BARS_NEEDED){
+        phase=1; flipTimer=40; flipAnim=0;
+        spawnBurst(W/2,H/2,'#FFD166',16);
+      }
+      if(phase===1){flipTimer--;flipAnim=1-(flipTimer/40);if(flipTimer<=0){phase=2;fx=W/2;fy=H/2;}}
+      if(phase===2&&side2.size>=BARS_NEEDED)return true;
+      return false;
+    },
+    draw(ctx,W,H){
+      // Grill surface
+      ctx.fillStyle='#080808'; rr(ctx,gX-12,gY-12,gW+24,gH+24,10); ctx.fill();
+      // Active heat glow
+      if(side1.size>0||phase>0){ctx.fillStyle=`rgba(255,80,0,${0.06+0.04*Math.sin(Date.now()/200)})`;rr(ctx,gX-12,gY-12,gW+24,gH+24,10);ctx.fill();}
+
+      // Grill bars
+      for(let i=0;i<BARS;i++){
+        const bx=gX+i*(gW/BARS);
+        const lit=(phase===0&&side1.has(i))||(phase===2&&side2.has(i));
+        ctx.fillStyle=lit?'#b02000':'#1e1e1e'; ctx.fillRect(bx+4,gY,gW/BARS-6,gH);
+        if(lit){ctx.fillStyle='rgba(255,120,0,0.5)';ctx.fillRect(bx+4,gY,gW/BARS-6,8);}
+      }
+
+      // Food with flip animation
+      let drawFx=Math.max(gX+16,Math.min(gX+gW-16,fx));
+      let drawFy=Math.max(gY+16,Math.min(gY+gH-16,fy));
+
+      ctx.save();
+      if(phase===1){
+        // Flip animation: scale Y from 1 → 0 → -1 (scale back)
+        const scaleY=Math.abs(Math.cos(flipAnim*Math.PI));
+        ctx.translate(W/2,gY+gH/2);ctx.scale(1,scaleY+0.05);ctx.translate(-W/2,-(gY+gH/2));
+      }
+
+      // Grill marks on food
+      const side1Pct=side1.size/BARS, side2Pct=side2.size/BARS;
+      const cookPct = phase<2 ? side1Pct : (side1Pct+side2Pct)/2;
+      const h1=Math.floor(220*(1-cookPct*0.5)), h2=Math.floor(180*(1-cookPct*0.6));
+      ctx.fillStyle=`rgba(0,0,0,0.18)`;ctx.beginPath();ctx.ellipse(drawFx+5,drawFy+9,36,22,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=`rgb(${220-Math.floor(cookPct*80)},${170-Math.floor(cookPct*100)},${60-Math.floor(cookPct*40)})`;
+      ctx.beginPath();ctx.ellipse(drawFx,drawFy,34,22,0,0,Math.PI*2);ctx.fill();
+
+      // Grill mark lines
+      const marks = phase>=2 ? side1 : side1;
+      ctx.strokeStyle='rgba(40,0,0,0.75)'; ctx.lineWidth=5;
+      for(let i=0;i<BARS;i++){
+        if((phase===0?side1:side2).has(i)){
+          const lx=gX+i*(gW/BARS)+gW/BARS/2;
+          if(lx>=drawFx-34&&lx<=drawFx+34){
+            ctx.beginPath();ctx.moveTo(lx,drawFy-18);ctx.lineTo(lx,drawFy+18);ctx.stroke();
+          }
+        }
+      }
+      ctx.font='40px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(step.emoji,drawFx,drawFy);
+      ctx.restore();
+
+      // Phase indicators (dots under grill)
+      const dotY=gY+gH+22;
+      for(let i=0;i<BARS;i++){
+        const dx=gX+i*(gW/BARS)+gW/BARS/2;
+        ctx.fillStyle=side1.has(i)?'#FF6B00':'rgba(255,255,255,0.12)'; ctx.beginPath();ctx.arc(dx,dotY,5,0,Math.PI*2);ctx.fill();
+      }
+      if(phase>=1){
+        for(let i=0;i<BARS;i++){
+          const dx=gX+i*(gW/BARS)+gW/BARS/2;
+          ctx.fillStyle=side2.has(i)?'#FFD166':'rgba(255,255,255,0.07)'; ctx.beginPath();ctx.arc(dx,dotY+14,5,0,Math.PI*2);ctx.fill();
+        }
+      }
+
+      // Flip message
+      if(phase===1){
+        ctx.fillStyle='#FFD166'; ctx.font='bold 18px Nunito,sans-serif'; ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('🔄 FLIP!', W/2, gY-28);
+      }
+
+      // Instruction
+      const instMsg=phase===0?`Drag across all ${BARS} grill lines — side 1!`:phase===1?'Flipping…':side2.size<BARS?`Drag across all ${BARS} grill lines — side 2!`:'✅ Both sides done!';
+      ctx.fillStyle=phase===1?'#FFD166':'#fff'; ctx.font='bold 15px Nunito,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+      ctx.fillText(instMsg,W/2,H-14);
+
+      // Side labels
+      ctx.fillStyle='rgba(255,107,0,0.8)'; ctx.font='10px Nunito,sans-serif';
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      ctx.fillText('Side 1 ●', gX, dotY+4);
+      if(phase>=1){ctx.fillStyle='rgba(255,209,102,0.8)'; ctx.fillText('Side 2 ●', gX, dotY+18);}
+
+      // Drag hint
+      if(!isDrag&&phase!==1){
+        const al=0.35+0.4*Math.abs(Math.sin(Date.now()/320));
+        ctx.globalAlpha=al;ctx.fillStyle='#fff';ctx.font='22px sans-serif';ctx.textAlign='center';
+        ctx.fillText('↔',W/2,gY-22);ctx.globalAlpha=1;
+      }
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// MINI-GAME: ADD — Drag ingredient into pot
+// ═══════════════════════════════════════════════
+function initAdd({step,meta,W,H}){
+  let ing={x:90,y:H/2-22,w:82,h:82,drag:false,placed:false};
+  let off={x:0,y:0},splashes=[];
+  const pot={x:W/2-78,y:H/2-58,w:164,h:114};
+  return{
+    down(p){
+      if(!ing.placed&&p.x>ing.x&&p.x<ing.x+ing.w&&p.y>ing.y&&p.y<ing.y+ing.h){
+        ing.drag=true;off={x:p.x-ing.x,y:p.y-ing.y};
+      }
+    },
+    move(p){if(ing.drag){ing.x=p.x-off.x;ing.y=p.y-off.y;}},
+    up(){
+      if(!ing.drag)return;ing.drag=false;
+      const cx=ing.x+ing.w/2,cy=ing.y+ing.h/2;
+      if(cx>pot.x&&cx<pot.x+pot.w&&cy>pot.y&&cy<pot.y+pot.h){
+        ing.placed=true;
+        for(let i=0;i<10;i++) splashes.push({x:pot.x+pot.w/2+(Math.random()-.5)*44,y:pot.y+24,vx:(Math.random()-.5)*4.5,vy:-2.5-Math.random()*3.5,life:32,color:meta.color});
+        spawnBurst(pot.x+pot.w/2,pot.y+30,meta.color,16);
+      } else {ing.x=90;ing.y=H/2-22;}
+    },
+    update(){return ing.placed;},
+    draw(ctx,W,H){
+      // Counter surface
+      ctx.fillStyle='#2e1a08';ctx.fillRect(0,H/2+28,200,H);
+      ctx.fillStyle='#3e2a14';ctx.fillRect(0,H/2+20,200,12);
+      // Pot
+      ctx.fillStyle='#555';rr(ctx,pot.x,pot.y,pot.w,pot.h,[8,8,18,18]);ctx.fill();
+      ctx.fillStyle='#111';rr(ctx,pot.x+12,pot.y+16,pot.w-24,pot.h-24,10);ctx.fill();
+      // Steam wisps
+      for(let i=0;i<3;i++){const sT=Date.now()/600+i;ctx.globalAlpha=0.2+0.1*Math.sin(sT);ctx.fillStyle='#aaa';ctx.beginPath();ctx.arc(pot.x+40+i*38,pot.y-14+5*Math.sin(sT),8,0,Math.PI*2);ctx.fill();}
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#666';ctx.fillRect(pot.x-8,pot.y-14,pot.w+16,14);
+      ctx.fillStyle='#888';rr(ctx,pot.x+pot.w/2-20,pot.y-28,40,16,7);ctx.fill();
+      ctx.fillStyle='#777';ctx.fillRect(pot.x-26,pot.y+22,26,20);ctx.fillRect(pot.x+pot.w,pot.y+22,26,20);
+      // Drop zone hint
+      if(!ing.placed){
+        ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=2;ctx.setLineDash([5,5]);
+        ctx.strokeRect(pot.x+10,pot.y+12,pot.w-20,pot.h-20);ctx.setLineDash([]);
+        ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='12px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('drop here',pot.x+pot.w/2,pot.y+pot.h/2+8);
+        // Ingredient sprite
+        ctx.fillStyle=meta.color;ctx.beginPath();ctx.arc(ing.x+ing.w/2,ing.y+ing.h/2,38,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=3;ctx.stroke();
+        ctx.font='32px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(step.emoji,ing.x+ing.w/2,ing.y+ing.h/2);
+        ctx.fillStyle='#fff';ctx.font='bold 11px Nunito,sans-serif';ctx.textBaseline='alphabetic';
+        const lbl=step.ingredient.length>11?step.ingredient.slice(0,11)+'…':step.ingredient;
+        ctx.fillText(lbl,ing.x+ing.w/2,ing.y+ing.h+14);
+        if(!ing.drag){const a=0.5+0.4*Math.sin(Date.now()/500);ctx.globalAlpha=a;ctx.fillStyle='#fff';ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText('⬆',ing.x+ing.w/2,ing.y-12);ctx.globalAlpha=1;}
+      }
+      // Splashes
+      splashes=splashes.filter(s=>s.life>0);
+      splashes.forEach(s=>{ctx.globalAlpha=s.life/32;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x,s.y,4,0,Math.PI*2);ctx.fill();s.x+=s.vx;s.y+=s.vy;s.vy+=0.22;s.life--;});
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#fff';ctx.font='bold 15px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      ctx.fillText(ing.placed?'✓ Added to the pot!':'Drag '+step.ingredient+' into the pot!',W/2,H-14);
+    }
+  };
+}
+</script>
+</body>
+</html>
